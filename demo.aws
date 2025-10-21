@@ -1,2 +1,7 @@
-xx
-yy
+aws {
+  ec2 {
+    name = "my-ec2"
+    descripttopn = "my ec2 instance demo"
+    image = "ubuntu"
+  }
+}
