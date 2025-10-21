@@ -23,6 +23,9 @@ pub(crate) enum TokenType {
     LessEqual,
     GreaterEqual,
     Minus,
+    Div,
+    // others
+    Comment,
     // End Of File token
     EoF,
 }
@@ -39,6 +42,7 @@ impl fmt::Display for TokenType {
             &TokenType::Dot => "DOT",
             &TokenType::Star => "STAR",
             &TokenType::Comma => "COMMA",
+            &TokenType::Div => "DIV",
             &TokenType::Minus => "MINUS",
             &TokenType::Equal => "EQUAL",
             &TokenType::Bang => "BANG",
@@ -48,9 +52,10 @@ impl fmt::Display for TokenType {
             &TokenType::EqualEqual => "EQUAL_EQUAL",
             &TokenType::LessEqual => "LESS_EQUAL",
             &TokenType::GreaterEqual => "GREATER_EQUAL",
+            &TokenType::Comment => "COMMENT",
             &TokenType::EoF => "EOF",
         };
-        write!(f, "type: {}", tok_s)
+        write!(f, "tok: {}", tok_s)
     }
 }
 
@@ -105,16 +110,12 @@ pub(crate) struct Scanner {
 }
 
 impl Scanner {
-    pub(crate) fn scan_tokens(&mut self) {
-        // for tok in self.contents.split_ascii_whitespace().into_iter() {
-        //     println!("tok: {}", tok);
-        // }
-        while self.current < self.contents.len() {
-            self.start = self.current;
-            self.scan_token();
+    pub(crate) fn peek(&self) -> Option<char> {
+        if self.current < self.contents.len() {
+            let c = &self.contents[self.current..self.current + 1];
+            return c.chars().next();
         }
-        let eof_tok = Token::new(TokenType::EoF, "".to_string(), None, self.line);
-        self.tokens.push(eof_tok);
+        return None;
     }
 
     //Read the current character and advance the pointer
@@ -124,10 +125,40 @@ impl Scanner {
         return c.chars().next();
     }
 
+    // Read until end of line, for handling comments
+    pub(crate) fn read_until_eol(&mut self) {
+        while self.current < self.contents.len() {
+            let c = self.advance();
+            match c {
+                Some('\n') => {
+                    self.line += 1;
+                    return;
+                }
+                Some('\r') => {
+                    return;
+                }
+                _ => {}
+            }
+        }
+    }
+
     pub(crate) fn add_token(&mut self, tok_type: TokenType) {
         let curr_str = &self.contents[self.start..self.current];
         self.tokens
             .push(Token::new(tok_type, curr_str.to_string(), None, self.line));
+    }
+
+    pub(crate) fn scan_tokens(&mut self) {
+        // for tok in self.contents.split_ascii_whitespace().into_iter() {
+        //     println!("tok: {}", tok);
+        // }
+        while self.current < self.contents.len() {
+            println!("line: {}", self.line);
+            self.start = self.current;
+            self.scan_token();
+        }
+        let eof_tok = Token::new(TokenType::EoF, "".to_string(), None, self.line);
+        self.tokens.push(eof_tok);
     }
 
     pub(crate) fn scan_token(&mut self) {
@@ -149,25 +180,70 @@ impl Scanner {
             Some('<') => {
                 // peek, if '=', then LessEqual
                 // otherwise emit Equal
-                self.add_token(TokenType::Less)
+                match self.peek() {
+                    Some('=') => {
+                        self.add_token(TokenType::LessEqual);
+                        self.current += 1;
+                        println!("=> {}", "<=")
+                    }
+                    _ => self.add_token(TokenType::Less),
+                }
             }
             Some('>') => {
                 // peek, if '=', then GreaterEqual
                 // otherwise emit Greater
-                self.add_token(TokenType::Greater)
+                match self.peek() {
+                    Some('=') => {
+                        self.add_token(TokenType::GreaterEqual);
+                        self.current += 1;
+                        println!("=> {}", ">=")
+                    }
+                    _ => self.add_token(TokenType::Greater),
+                }
             }
             Some('!') => {
                 // peek, if '=', then BangEqual
                 // otherwise emit bang
-                self.add_token(TokenType::Bang)
+                match self.peek() {
+                    Some('=') => {
+                        self.add_token(TokenType::BangEqual);
+                        self.current += 1;
+                        println!("=> {}", "!=")
+                    }
+                    _ => self.add_token(TokenType::Bang),
+                }
             }
             Some('=') => {
                 // peek, if '=', then EqualEqual
                 // otherwie emit Equal
-                self.add_token(TokenType::Equal)
+                match self.peek() {
+                    Some('=') => {
+                        self.add_token(TokenType::EqualEqual);
+                        self.current += 1;
+                        println!("=> {}", "==")
+                    }
+                    _ => self.add_token(TokenType::Equal),
+                }
             }
+            Some('/') => {
+                // peek, if '/', then advance until \n, emit Comment
+                // otherwie emit Div
+                match self.peek() {
+                    Some('/') => {
+                        println!("=> {}", "//");
+                        self.read_until_eol();
+                        self.add_token(TokenType::Comment);
+                        self.current += 1;
+                    }
+                    _ => self.add_token(TokenType::Div),
+                }
+            }
+            Some(' ') => {}
+            Some('\t') => {}
+            Some('\r') => {}
+            Some('\n') => self.line += 1,
             _ => {
-                println!("unrecognised token: {}", c.unwrap_or_default());
+                println!("unrecognised token: *{}*", c.unwrap_or_default());
             }
         }
     }
@@ -191,7 +267,7 @@ pub(crate) fn read_lex_file(s: &str) -> Result<Scanner, Box<dyn error::Error>> {
         errors: vec![],
         start: 0,
         current: 0,
-        line: 0,
+        line: 1,
     };
     Ok(my_scanner)
 }
