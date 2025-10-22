@@ -1,6 +1,7 @@
 use std::error;
 use std::fmt;
 use std::fs;
+use std::io::Error;
 
 // Token stuff
 pub(crate) enum TokenType {
@@ -26,6 +27,7 @@ pub(crate) enum TokenType {
     Div,
     // others
     Comment,
+    StringLiteral,
     // End Of File token
     EoF,
 }
@@ -53,6 +55,7 @@ impl fmt::Display for TokenType {
             &TokenType::LessEqual => "LESS_EQUAL",
             &TokenType::GreaterEqual => "GREATER_EQUAL",
             &TokenType::Comment => "COMMENT",
+            &TokenType::StringLiteral => "STRING_LITERAL",
             &TokenType::EoF => "EOF",
         };
         write!(f, "tok: {}", tok_s)
@@ -90,7 +93,8 @@ impl fmt::Display for Token {
         };
         write!(
             f,
-            "type {}, lexeme {}, literal {}",
+            "[{}] type {}, lexeme {}, literal {}",
+            self.line_no,
             self.token_type,
             self.lexeme,
             lit.to_string(),
@@ -110,6 +114,7 @@ pub(crate) struct Scanner {
 }
 
 impl Scanner {
+    // peek into next character but don't consume
     pub(crate) fn peek(&self) -> Option<char> {
         if self.current < self.contents.len() {
             let c = &self.contents[self.current..self.current + 1];
@@ -142,6 +147,22 @@ impl Scanner {
         }
     }
 
+    pub(crate) fn read_until_eo_quote(&mut self) {
+        while self.current < self.contents.len() {
+            let c = self.advance();
+            match c {
+                Some('\n') => {
+                    self.line += 1;
+                }
+                Some('\r') => {
+                    self.line += 1;
+                }
+                Some('"') => return,
+                _ => {}
+            }
+        }
+    }
+
     pub(crate) fn add_token(&mut self, tok_type: TokenType) {
         let curr_str = &self.contents[self.start..self.current];
         self.tokens
@@ -164,6 +185,7 @@ impl Scanner {
     pub(crate) fn scan_token(&mut self) {
         let c = self.advance();
         match c {
+            // handle single character ones
             Some('(') => self.add_token(TokenType::LeftParen),
             Some(')') => self.add_token(TokenType::RightParen),
             Some('{') => self.add_token(TokenType::LeftBrace),
@@ -177,6 +199,7 @@ impl Scanner {
             Some(',') => self.add_token(TokenType::Comma),
             Some('*') => self.add_token(TokenType::Star),
             Some('-') => self.add_token(TokenType::Minus),
+            // handle two character operators
             Some('<') => {
                 // peek, if '=', then LessEqual
                 // otherwise emit Equal
@@ -238,6 +261,22 @@ impl Scanner {
                     _ => self.add_token(TokenType::Div),
                 }
             }
+            // handle string literal
+            Some('"') => {
+                // start after the quote
+                self.start += 1;
+                self.read_until_eo_quote();
+                // since at current end quote ", move one step back
+                self.current -= 1;
+                println!(
+                    "=> in a string: {}",
+                    &self.contents[self.start..self.current]
+                );
+                self.add_token(TokenType::StringLiteral);
+                // now we step forward by 2 to lose end quote "
+                self.current += 2;
+            }
+            // handle whitespace and CRLF
             Some(' ') => {}
             Some('\t') => {}
             Some('\r') => {}
