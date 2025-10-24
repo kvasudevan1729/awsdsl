@@ -1,7 +1,6 @@
 use std::error;
 use std::fmt;
 use std::fs;
-use std::io::Error;
 
 // Token stuff
 pub(crate) enum TokenType {
@@ -28,6 +27,9 @@ pub(crate) enum TokenType {
     // others
     Comment,
     StringLiteral,
+    Number,
+    Identifier,
+    Keyword,
     // End Of File token
     EoF,
 }
@@ -56,11 +58,24 @@ impl fmt::Display for TokenType {
             &TokenType::GreaterEqual => "GREATER_EQUAL",
             &TokenType::Comment => "COMMENT",
             &TokenType::StringLiteral => "STRING_LITERAL",
+            &TokenType::Number => "NUMBER",
+            &TokenType::Identifier => "IDENTIFIER",
+            &TokenType::Keyword => "KEYWORD",
             &TokenType::EoF => "EOF",
         };
         write!(f, "tok: {}", tok_s)
     }
 }
+
+static KEYWORDS: [&str; 7] = [
+    "aws",
+    "ec2",
+    "name",
+    "description",
+    "count",
+    "app_version",
+    "image",
+];
 
 pub(crate) struct Token {
     pub(crate) token_type: TokenType,
@@ -163,6 +178,34 @@ impl Scanner {
         }
     }
 
+    pub(crate) fn scan_number(&mut self) {
+        while self.current < self.contents.len() {
+            let c = self.advance();
+            match c {
+                Some('.') => {} // decimal number
+                _ => {
+                    if let Some(n) = c {
+                        if !n.is_numeric() {
+                            return;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // identifier can contain alphanumeric and '_'
+    pub(crate) fn scan_identifier(&mut self) {
+        while self.current < self.contents.len() {
+            let c = self.advance();
+            if let Some(x) = c {
+                if !x.is_alphanumeric() && x != '_' {
+                    return;
+                }
+            }
+        }
+    }
+
     pub(crate) fn add_token(&mut self, tok_type: TokenType) {
         let curr_str = &self.contents[self.start..self.current];
         self.tokens
@@ -182,6 +225,7 @@ impl Scanner {
         self.tokens.push(eof_tok);
     }
 
+    //TODO: handle errors
     pub(crate) fn scan_token(&mut self) {
         let c = self.advance();
         match c {
@@ -266,7 +310,7 @@ impl Scanner {
                 // start after the quote
                 self.start += 1;
                 self.read_until_eo_quote();
-                // since at current end quote ", move one step back
+                // at end quote ", move one step back to capture string
                 self.current -= 1;
                 println!(
                     "=> in a string: {}",
@@ -279,10 +323,32 @@ impl Scanner {
             // handle whitespace and CRLF
             Some(' ') => {}
             Some('\t') => {}
-            Some('\r') => {}
+            Some('\r') => self.line += 1,
             Some('\n') => self.line += 1,
             _ => {
-                println!("unrecognised token: *{}*", c.unwrap_or_default());
+                // we handle digits and numbers here as we need to look for 0-9
+                // and that will require an arm for each digit.
+                if let Some(x) = c {
+                    if x.is_numeric() {
+                        self.scan_number();
+                        println!("number: {}", &self.contents[self.start..self.current]);
+                        self.add_token(TokenType::Number);
+                    } else {
+                        // check for identifier
+                        self.scan_identifier();
+                        // is this identifier a keyword?
+                        let idfr = &self.contents[self.start..self.current];
+                        if KEYWORDS.contains(&idfr) {
+                            println!("keyword: {}", &self.contents[self.start..self.current]);
+                            self.add_token(TokenType::Keyword);
+                        } else {
+                            println!("identifier: {}", &self.contents[self.start..self.current]);
+                            self.add_token(TokenType::Identifier);
+                        }
+                    }
+                } else {
+                    println!("unrecognised token: *{}*", c.unwrap_or_default());
+                }
             }
         }
     }

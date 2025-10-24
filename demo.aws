@@ -1,7 +1,14 @@
 aws {
   ec2 {
     name = "my-ec2"
-    descripttopn = "my ec2 instance demo"
-    image = "ubuntu"
+    description = "my ec2 instance demo"
+    count = 1
+    app_version = 2.1
+    image >= "ubuntu"
+    image <= "ubuntu"
+    image == "ubuntu"
+    image != "ubuntu"
+    // some comment
+    my_id = 100
   }
 }
