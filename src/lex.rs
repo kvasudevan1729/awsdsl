@@ -3,11 +3,14 @@ use std::fmt;
 use std::fs;
 
 // Token stuff
+#[derive(PartialEq)]
 pub(crate) enum TokenType {
+    // grouping
     LeftParen,
     RightParen,
     LeftBrace,
     RightBrace,
+    // markers
     SemiColon,
     Colon,
     Equal,
@@ -67,7 +70,7 @@ impl fmt::Display for TokenType {
     }
 }
 
-static KEYWORDS: [&str; 7] = [
+static KEYWORDS: [&str; 8] = [
     "aws",
     "ec2",
     "name",
@@ -75,6 +78,7 @@ static KEYWORDS: [&str; 7] = [
     "count",
     "app_version",
     "image",
+    "region",
 ];
 
 pub(crate) struct Token {
@@ -82,6 +86,7 @@ pub(crate) struct Token {
     pub(crate) lexeme: String,
     pub(crate) literal: Option<String>,
     pub(crate) line_no: usize,
+    pub(crate) column_no: usize,
 }
 
 impl Token {
@@ -90,34 +95,38 @@ impl Token {
         lexeme: String,
         literal: Option<String>,
         line_no: usize,
+        column_no: usize,
     ) -> Self {
         Token {
             token_type: token_type,
             lexeme: lexeme,
             literal: literal,
             line_no: line_no,
+            column_no: column_no,
         }
     }
 }
 
 impl fmt::Display for Token {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let s = format!(
+            "[{}:{}] type: {}, lexeme: {}",
+            self.line_no, self.column_no, self.token_type, self.lexeme,
+        );
         let lit = match self.literal.as_ref() {
-            Some(x) => x,
-            _ => &String::from(""),
+            Some(x) => {
+                format!("{}, literal: {}", s, x)
+            }
+            _ => {
+                format!("{}", s)
+            }
         };
-        write!(
-            f,
-            "[{}] type {}, lexeme {}, literal {}",
-            self.line_no,
-            self.token_type,
-            self.lexeme,
-            lit.to_string(),
-        )
+        write!(f, "{}", lit)
     }
 }
 
 // Scanner
+#[derive(Default)]
 pub(crate) struct Scanner {
     pub(crate) source: String,
     pub(crate) contents: String,
@@ -126,9 +135,19 @@ pub(crate) struct Scanner {
     pub(crate) start: usize,
     pub(crate) current: usize,
     pub(crate) line: usize,
+    pub(crate) column_no: usize,
 }
 
 impl Scanner {
+    pub(crate) fn new(src_file: String, contents: String) -> Self {
+        Scanner {
+            source: src_file,
+            contents: contents,
+            line: 1,
+            ..Default::default()
+        }
+    }
+
     // peek into next character but don't consume
     pub(crate) fn peek(&self) -> Option<char> {
         if self.current < self.contents.len() {
@@ -142,6 +161,7 @@ impl Scanner {
     pub(crate) fn advance(&mut self) -> Option<char> {
         let c = &self.contents[self.current..self.current + 1];
         self.current += 1;
+        self.column_no += 1;
         return c.chars().next();
     }
 
@@ -152,9 +172,12 @@ impl Scanner {
             match c {
                 Some('\n') => {
                     self.line += 1;
+                    self.column_no = 0;
                     return;
                 }
                 Some('\r') => {
+                    self.line += 1;
+                    self.column_no = 0;
                     return;
                 }
                 _ => {}
@@ -168,11 +191,18 @@ impl Scanner {
             match c {
                 Some('\n') => {
                     self.line += 1;
+                    println!("n, {}", self.column_no);
+                    self.column_no = 0;
                 }
                 Some('\r') => {
                     self.line += 1;
+                    println!("r, {}", self.column_no);
+                    self.column_no = 0;
                 }
-                Some('"') => return,
+                Some('"') => {
+                    println!("\nend of quote, {}", self.column_no);
+                    return;
+                }
                 _ => {}
             }
         }
@@ -195,7 +225,7 @@ impl Scanner {
     }
 
     // identifier can contain alphanumeric and '_'
-    pub(crate) fn scan_identifier(&mut self) {
+    pub(crate) fn scan_lexeme_with_underscore(&mut self) {
         while self.current < self.contents.len() {
             let c = self.advance();
             if let Some(x) = c {
@@ -206,10 +236,20 @@ impl Scanner {
         }
     }
 
-    pub(crate) fn add_token(&mut self, tok_type: TokenType) {
+    pub(crate) fn add_token(&mut self, tok_type: TokenType, literal: Option<String>) {
         let curr_str = &self.contents[self.start..self.current];
-        self.tokens
-            .push(Token::new(tok_type, curr_str.to_string(), None, self.line));
+        let len_tok = self.current - self.start;
+        let mut start_col_no = 0;
+        if self.column_no > len_tok {
+            start_col_no = self.column_no - len_tok;
+        }
+        self.tokens.push(Token::new(
+            tok_type,
+            curr_str.to_string(),
+            literal,
+            self.line,
+            start_col_no, // we need the start column
+        ));
     }
 
     pub(crate) fn scan_tokens(&mut self) {
@@ -217,11 +257,16 @@ impl Scanner {
         //     println!("tok: {}", tok);
         // }
         while self.current < self.contents.len() {
-            println!("line: {}", self.line);
             self.start = self.current;
             self.scan_token();
         }
-        let eof_tok = Token::new(TokenType::EoF, "".to_string(), None, self.line);
+        let eof_tok = Token::new(
+            TokenType::EoF,
+            "".to_string(),
+            None,
+            self.line,
+            self.column_no,
+        );
         self.tokens.push(eof_tok);
     }
 
@@ -230,30 +275,28 @@ impl Scanner {
         let c = self.advance();
         match c {
             // handle single character ones
-            Some('(') => self.add_token(TokenType::LeftParen),
-            Some(')') => self.add_token(TokenType::RightParen),
-            Some('{') => self.add_token(TokenType::LeftBrace),
+            Some('(') => self.add_token(TokenType::LeftParen, None),
+            Some(')') => self.add_token(TokenType::RightParen, None),
+            Some('{') => self.add_token(TokenType::LeftBrace, None),
             Some('}') => {
-                self.add_token(TokenType::RightBrace);
-                println!("=> {}", "}")
+                self.add_token(TokenType::RightBrace, None);
             }
-            Some(';') => self.add_token(TokenType::SemiColon),
-            Some(':') => self.add_token(TokenType::Colon),
-            Some('.') => self.add_token(TokenType::Dot),
-            Some(',') => self.add_token(TokenType::Comma),
-            Some('*') => self.add_token(TokenType::Star),
-            Some('-') => self.add_token(TokenType::Minus),
+            Some(';') => self.add_token(TokenType::SemiColon, None),
+            Some(':') => self.add_token(TokenType::Colon, None),
+            Some('.') => self.add_token(TokenType::Dot, None),
+            Some(',') => self.add_token(TokenType::Comma, None),
+            Some('*') => self.add_token(TokenType::Star, None),
+            Some('-') => self.add_token(TokenType::Minus, None),
             // handle two character operators
             Some('<') => {
                 // peek, if '=', then LessEqual
                 // otherwise emit Equal
                 match self.peek() {
                     Some('=') => {
-                        self.add_token(TokenType::LessEqual);
+                        self.add_token(TokenType::LessEqual, None);
                         self.current += 1;
-                        println!("=> {}", "<=")
                     }
-                    _ => self.add_token(TokenType::Less),
+                    _ => self.add_token(TokenType::Less, None),
                 }
             }
             Some('>') => {
@@ -261,11 +304,10 @@ impl Scanner {
                 // otherwise emit Greater
                 match self.peek() {
                     Some('=') => {
-                        self.add_token(TokenType::GreaterEqual);
+                        self.add_token(TokenType::GreaterEqual, None);
                         self.current += 1;
-                        println!("=> {}", ">=")
                     }
-                    _ => self.add_token(TokenType::Greater),
+                    _ => self.add_token(TokenType::Greater, None),
                 }
             }
             Some('!') => {
@@ -273,11 +315,10 @@ impl Scanner {
                 // otherwise emit bang
                 match self.peek() {
                     Some('=') => {
-                        self.add_token(TokenType::BangEqual);
+                        self.add_token(TokenType::BangEqual, None);
                         self.current += 1;
-                        println!("=> {}", "!=")
                     }
-                    _ => self.add_token(TokenType::Bang),
+                    _ => self.add_token(TokenType::Bang, None),
                 }
             }
             Some('=') => {
@@ -285,11 +326,10 @@ impl Scanner {
                 // otherwie emit Equal
                 match self.peek() {
                     Some('=') => {
-                        self.add_token(TokenType::EqualEqual);
+                        self.add_token(TokenType::EqualEqual, None);
                         self.current += 1;
-                        println!("=> {}", "==")
                     }
-                    _ => self.add_token(TokenType::Equal),
+                    _ => self.add_token(TokenType::Equal, None),
                 }
             }
             Some('/') => {
@@ -297,57 +337,73 @@ impl Scanner {
                 // otherwie emit Div
                 match self.peek() {
                     Some('/') => {
-                        println!("=> {}", "//");
                         self.read_until_eol();
-                        self.add_token(TokenType::Comment);
+                        self.add_token(TokenType::Comment, None);
                         self.current += 1;
                     }
-                    _ => self.add_token(TokenType::Div),
+                    _ => self.add_token(TokenType::Div, None),
                 }
             }
             // handle string literal
             Some('"') => {
-                // start after the quote
-                self.start += 1;
                 self.read_until_eo_quote();
-                // at end quote ", move one step back to capture string
-                self.current -= 1;
+                let literal = &self.contents[self.start + 1..self.current - 1];
+                self.add_token(TokenType::StringLiteral, Some(literal.to_string()));
+                println!("\nquote, final: {}", self.column_no);
                 println!(
-                    "=> in a string: {}",
-                    &self.contents[self.start..self.current]
+                    "after quote: *{}*",
+                    &self.contents[self.current - 1..self.current + 1]
                 );
-                self.add_token(TokenType::StringLiteral);
-                // now we step forward by 2 to lose end quote "
-                self.current += 2;
+                //self.current += 1;
             }
             // handle whitespace and CRLF
             Some(' ') => {}
             Some('\t') => {}
-            Some('\r') => self.line += 1,
-            Some('\n') => self.line += 1,
+            Some('\r') => {
+                self.line += 1;
+                self.column_no = 1;
+                println!("main r, final: {}", self.column_no);
+            }
+            Some('\n') => {
+                self.line += 1;
+                self.column_no = 1;
+                println!("main n, final: {}", self.column_no);
+            }
             _ => {
-                // we handle digits and numbers here as we need to look for 0-9
-                // and that will require an arm for each digit.
+                // the rest we handle here:
+                // numbers, keywords and identifiers
+                // identifiers don't start with digits, so if a lexeme starts
+                // with a digit, then it is a number
+                println!("other: {}", self.column_no);
                 if let Some(x) = c {
+                    println!("other inside: {}", self.column_no);
                     if x.is_numeric() {
                         self.scan_number();
-                        println!("number: {}", &self.contents[self.start..self.current]);
-                        self.add_token(TokenType::Number);
+                        self.current -= 1;
+                        let n = &self.contents[self.start..self.current];
+                        self.add_token(TokenType::Number, Some(n.to_string()));
+                        // self.current += 1;
                     } else {
-                        // check for identifier
-                        self.scan_identifier();
-                        // is this identifier a keyword?
-                        let idfr = &self.contents[self.start..self.current];
-                        if KEYWORDS.contains(&idfr) {
-                            println!("keyword: {}", &self.contents[self.start..self.current]);
-                            self.add_token(TokenType::Keyword);
+                        // can be either an identifier or keywords
+                        // if the current lexeme doesn't start with a digit, then
+                        // it must be either an identifier or a keyword.
+                        // identifiers can contain digits as long as they don't
+                        // start with one.
+                        self.scan_lexeme_with_underscore();
+                        let s = &self.contents[self.start..self.current - 1];
+                        println!("s: {}", s);
+                        if KEYWORDS.contains(&s) {
+                            self.current -= 1;
+                            println!("==> adding keyword!");
+                            self.add_token(TokenType::Keyword, None);
+                            self.current += 1;
                         } else {
-                            println!("identifier: {}", &self.contents[self.start..self.current]);
-                            self.add_token(TokenType::Identifier);
+                            self.current -= 1;
+                            println!("==> adding identifier!");
+                            self.add_token(TokenType::Identifier, None);
+                            self.current += 1;
                         }
                     }
-                } else {
-                    println!("unrecognised token: *{}*", c.unwrap_or_default());
                 }
             }
         }
@@ -365,14 +421,81 @@ pub(crate) fn report(line: u32, col_loc: &str, msg: &str) {
 
 pub(crate) fn read_lex_file(s: &str) -> Result<Scanner, Box<dyn error::Error>> {
     let lexf_s = fs::read_to_string(s)?;
-    let my_scanner: Scanner = Scanner {
-        source: s.to_string(),
-        contents: lexf_s.to_string(),
-        tokens: vec![],
-        errors: vec![],
-        start: 0,
-        current: 0,
-        line: 1,
-    };
+    let my_scanner: Scanner = Scanner::new(s.to_string(), lexf_s.to_string());
     Ok(my_scanner)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_number() {
+        let s = "count = 10";
+        let mut scanr = Scanner::new("".to_string(), s.to_string());
+        scanr.scan_tokens();
+        let number_tok_exists = |tokens: Vec<Token>| -> bool {
+            for tok in tokens {
+                if tok.token_type == TokenType::Number {
+                    return true;
+                }
+            }
+            false
+        };
+        assert!(number_tok_exists(scanr.tokens));
+    }
+
+    #[test]
+    fn test_decimal_number() {
+        let s = "count = 10.0";
+        let mut scanr = Scanner::new("".to_string(), s.to_string());
+        scanr.scan_tokens();
+        let num_tokens = scanr
+            .tokens
+            .iter()
+            .filter_map(|tok| match tok.token_type {
+                TokenType::Number => tok.lexeme.parse::<f32>().ok(),
+                _ => None,
+            })
+            .collect::<Vec<f32>>();
+        assert_eq!(num_tokens.get(0), Some(&10.0));
+    }
+
+    #[test]
+    fn test_string() {
+        let s = "name = \"my_node\"";
+        let mut scanr = Scanner::new("".to_string(), s.to_string());
+        scanr.scan_tokens();
+        let comment_toks = scanr
+            .tokens
+            .iter()
+            .filter_map(|tok| match tok.token_type {
+                TokenType::StringLiteral => Some(tok.literal.as_ref().unwrap()),
+                _ => None,
+            })
+            .collect::<Vec<&String>>();
+        let expected = String::from("my_node");
+        assert_eq!(comment_toks.get(0), Some(&&expected));
+    }
+
+    #[test]
+    fn test_keyword() {
+        let s = "count = 10.0";
+        let mut scanr = Scanner::new("".to_string(), s.to_string());
+        scanr.scan_tokens();
+        let kword_tokens = scanr
+            .tokens
+            .iter()
+            .filter_map(|tok| match tok.token_type {
+                TokenType::Keyword => Some(tok.lexeme.as_str()),
+                _ => None,
+            })
+            .collect::<Vec<&str>>();
+        assert_eq!(kword_tokens.get(0), Some(&"count"));
+    }
+
+    #[test]
+    fn test_comment() {
+        //
+    }
 }

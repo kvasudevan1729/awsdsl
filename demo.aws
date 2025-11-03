@@ -1,4 +1,7 @@
 aws {
+  region = "eu-west-1"
+  name = "eu aws"
+  description = "eu west env"
   ec2 {
     name = "my-ec2"
     description = "my ec2 instance demo"
@@ -9,6 +12,7 @@ aws {
     image == "ubuntu"
     image != "ubuntu"
     // some comment
-    my_id = 100
+    // more comment
+    ec2_id = 100
   }
 }
