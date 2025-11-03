@@ -1,0 +1,33 @@
+// cfg for aws language
+root: aws_stmt
+;
+
+aws_stmt: AWS "{" ec2_block "}"
+;
+
+ec2_block: EC2 "{" ec2_attrs "}"
+;
+
+ec2_attrs: ec2_attrs ec2_attr
+;
+
+ec2_attr: id_attr | name_attr | desc_attr | image_attr | count_attr
+;
+
+id_attr: ec2_id "=" NUMBER
+;
+
+name_attr: NAME "=" string_val
+;
+
+desc_attr: DESC "=" string_val
+;
+
+image_attr: IMAGE "=" string_val
+;
+
+count_attr: COUNT "=" string_val
+;
+
+string_val: QUOTE STR QUOTE
+;
