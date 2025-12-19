@@ -70,9 +70,10 @@ impl fmt::Display for TokenType {
     }
 }
 
-static KEYWORDS: [&str; 8] = [
+static KEYWORDS: [&str; 9] = [
     "aws",
     "ec2",
+    "ec2_id",
     "name",
     "description",
     "count",
@@ -125,7 +126,12 @@ impl fmt::Display for Token {
     }
 }
 
-// Scanner
+/// Scanner
+/// source: source file path
+/// contents: contents from `source` to parse
+/// current: maintains the current pointer in the `contents`
+/// line: the current line in `contents`
+/// column_no: current column being read in `line`
 #[derive(Default)]
 pub(crate) struct Scanner {
     pub(crate) source: String,
@@ -139,6 +145,7 @@ pub(crate) struct Scanner {
 }
 
 impl Scanner {
+    /// Create a new scanner based on the src file path and its contents
     pub(crate) fn new(src_file: String, contents: String) -> Self {
         Scanner {
             source: src_file,
@@ -148,7 +155,7 @@ impl Scanner {
         }
     }
 
-    // peek into next character but don't consume
+    /// peek into next character but don't consume
     pub(crate) fn peek(&self) -> Option<char> {
         if self.current < self.contents.len() {
             let c = &self.contents[self.current..self.current + 1];
@@ -157,7 +164,7 @@ impl Scanner {
         return None;
     }
 
-    //Read the current character and advance the pointer
+    /// Read the current character and advance the pointer
     pub(crate) fn advance(&mut self) -> Option<char> {
         let c = &self.contents[self.current..self.current + 1];
         self.current += 1;
@@ -165,7 +172,7 @@ impl Scanner {
         return c.chars().next();
     }
 
-    // Read until end of line, for handling comments
+    /// Read until end of line, for handling comments
     pub(crate) fn read_until_eol(&mut self) {
         while self.current < self.contents.len() {
             let c = self.advance();
@@ -185,6 +192,7 @@ impl Scanner {
         }
     }
 
+    /// read until end of a quote, handles multi lines
     pub(crate) fn read_until_eo_quote(&mut self) {
         while self.current < self.contents.len() {
             let c = self.advance();
@@ -208,6 +216,7 @@ impl Scanner {
         }
     }
 
+    /// scane for an integer or a decimal
     pub(crate) fn scan_number(&mut self) {
         while self.current < self.contents.len() {
             let c = self.advance();
@@ -224,7 +233,7 @@ impl Scanner {
         }
     }
 
-    // identifier can contain alphanumeric and '_'
+    /// identifier can contain alphanumeric and '_'
     pub(crate) fn scan_lexeme_with_underscore(&mut self) {
         while self.current < self.contents.len() {
             let c = self.advance();
@@ -236,6 +245,7 @@ impl Scanner {
         }
     }
 
+    /// Store the token in our scanner
     pub(crate) fn add_token(&mut self, tok_type: TokenType, literal: Option<String>) {
         let curr_str = &self.contents[self.start..self.current];
         let len_tok = self.current - self.start;
@@ -252,6 +262,7 @@ impl Scanner {
         ));
     }
 
+    /// Start scanning the tokens from start
     pub(crate) fn scan_tokens(&mut self) {
         // for tok in self.contents.split_ascii_whitespace().into_iter() {
         //     println!("tok: {}", tok);
@@ -270,7 +281,9 @@ impl Scanner {
         self.tokens.push(eof_tok);
     }
 
-    //TODO: handle errors
+    /// Scan toke based on the `token_type`. For multi characters
+    /// token, use `peek()`.
+    /// TODO: handle errors
     pub(crate) fn scan_token(&mut self) {
         let c = self.advance();
         match c {
@@ -388,7 +401,7 @@ impl Scanner {
                         // if the current lexeme doesn't start with a digit, then
                         // it must be either an identifier or a keyword.
                         // identifiers can contain digits as long as they don't
-                        // start with one.
+                        // start with a digit.
                         self.scan_lexeme_with_underscore();
                         let s = &self.contents[self.start..self.current - 1];
                         println!("s: {}", s);
@@ -410,15 +423,18 @@ impl Scanner {
     }
 }
 
+/// Report an error using the line number and a short message
 pub(crate) fn error(line: u32, msg: &str) {
     // also add to errors
     report(line, "".to_string().as_str(), &msg);
 }
 
+/// Print the error message
 pub(crate) fn report(line: u32, col_loc: &str, msg: &str) {
     println!("[line [{}] Error where: {}: {}] ", line, col_loc, msg);
 }
 
+/// Read the input file and return a `Scanner`
 pub(crate) fn read_lex_file(s: &str) -> Result<Scanner, Box<dyn error::Error>> {
     let lexf_s = fs::read_to_string(s)?;
     let my_scanner: Scanner = Scanner::new(s.to_string(), lexf_s.to_string());
@@ -431,7 +447,7 @@ mod tests {
 
     #[test]
     fn test_number() {
-        let s = "count = 10";
+        let s = "aws { ec2 { count = 10 } }";
         let mut scanr = Scanner::new("".to_string(), s.to_string());
         scanr.scan_tokens();
         let number_tok_exists = |tokens: Vec<Token>| -> bool {
@@ -447,7 +463,7 @@ mod tests {
 
     #[test]
     fn test_decimal_number() {
-        let s = "count = 10.0";
+        let s = "aws { ec2 { count = 10.0 } }";
         let mut scanr = Scanner::new("".to_string(), s.to_string());
         scanr.scan_tokens();
         let num_tokens = scanr
@@ -463,7 +479,7 @@ mod tests {
 
     #[test]
     fn test_string() {
-        let s = "name = \"my_node\"";
+        let s = "aws { ec2 { name = \"my_node\" } }";
         let mut scanr = Scanner::new("".to_string(), s.to_string());
         scanr.scan_tokens();
         let comment_toks = scanr
@@ -479,8 +495,8 @@ mod tests {
     }
 
     #[test]
-    fn test_keyword() {
-        let s = "count = 10.0";
+    fn test_ec2_id() {
+        let s = "aws { ec2 { ec2_id = 10 } }";
         let mut scanr = Scanner::new("".to_string(), s.to_string());
         scanr.scan_tokens();
         let kword_tokens = scanr
@@ -491,7 +507,40 @@ mod tests {
                 _ => None,
             })
             .collect::<Vec<&str>>();
-        assert_eq!(kword_tokens.get(0), Some(&"count"));
+        println!("kword_tokens: {:?}", kword_tokens);
+        assert_eq!(kword_tokens.get(2), Some(&"ec2_id"));
+    }
+
+    #[test]
+    fn test_image() {
+        let s = "aws { ec2 { image = \"test-image\" } }";
+        let mut scanr = Scanner::new("".to_string(), s.to_string());
+        scanr.scan_tokens();
+        let kword_tokens = scanr
+            .tokens
+            .iter()
+            .filter_map(|tok| match tok.token_type {
+                TokenType::Keyword => Some(tok.lexeme.as_str()),
+                _ => None,
+            })
+            .collect::<Vec<&str>>();
+        assert_eq!(kword_tokens.get(2), Some(&"image"));
+    }
+
+    #[test]
+    fn test_app_version() {
+        let s = "aws { ec2 { app_version = 10.0 } }";
+        let mut scanr = Scanner::new("".to_string(), s.to_string());
+        scanr.scan_tokens();
+        let kword_tokens = scanr
+            .tokens
+            .iter()
+            .filter_map(|tok| match tok.token_type {
+                TokenType::Keyword => Some(tok.lexeme.as_str()),
+                _ => None,
+            })
+            .collect::<Vec<&str>>();
+        assert_eq!(kword_tokens.get(2), Some(&"app_version"));
     }
 
     #[test]

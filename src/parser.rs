@@ -142,6 +142,8 @@ impl<'a> Parser<'a> {
     fn aws(&mut self) -> Result<AwsNode, ParseError> {
         if let Some(aws) = self.next() {
             let mut aws_node = AwsNode::new(aws.lexeme.to_string());
+            // attrs - name, region
+
             let ec2 = self.ec2()?;
             aws_node.add_ec2(ec2);
             return Ok(aws_node);
