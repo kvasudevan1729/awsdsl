@@ -408,12 +408,12 @@ impl Scanner {
                         if KEYWORDS.contains(&s) {
                             self.current -= 1;
                             println!("==> adding keyword!");
-                            self.add_token(TokenType::Keyword, None);
+                            self.add_token(TokenType::Keyword, Some(s.to_string()));
                             self.current += 1;
                         } else {
                             self.current -= 1;
                             println!("==> adding identifier!");
-                            self.add_token(TokenType::Identifier, None);
+                            self.add_token(TokenType::Identifier, Some(s.to_string()));
                             self.current += 1;
                         }
                     }

@@ -5,6 +5,7 @@ use crate::{
 use std::env;
 
 mod lex;
+mod nodes;
 mod parser;
 mod symbols;
 

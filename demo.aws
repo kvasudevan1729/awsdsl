@@ -3,16 +3,12 @@ aws {
   name = "eu aws"
   description = "eu west env"
   ec2 {
+    // some comment
+    // more comment
     name = "my-ec2"
     description = "my ec2 instance demo"
     count = 1
     app_version = 2.1
-    image >= "ubuntu"
-    image <= "ubuntu"
-    image == "ubuntu"
-    image != "ubuntu"
-    // some comment
-    // more comment
-    ec2_id = 100
+    image = "ubuntu"
   }
 }
