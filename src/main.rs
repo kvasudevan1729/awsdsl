@@ -1,12 +1,10 @@
-use crate::{
-    lex::{error, read_lex_file},
-    parser::Parser,
-};
+use crate::aws::ParseTree;
+use crate::lex::{error, read_lex_file};
+
 use std::env;
 
+mod aws;
 mod lex;
-mod nodes;
-mod parser;
 mod symbols;
 
 fn main() {
@@ -23,10 +21,10 @@ fn main() {
                     error(0, "HAD ERROR");
                 }
                 symbols::build_parse_tree(&my_scanner);
-                let mut aws_parser = Parser::new(my_scanner.tokens.as_ref());
+                let mut aws_parser = aws::parser::Parser::new(my_scanner.tokens.as_ref());
                 match aws_parser.parse() {
-                    Ok(ptree) => {
-                        println!("{}", ptree);
+                    Ok(aws_node) => {
+                        println!("\nparse tree:\n{}", aws_node.ast(2))
                     }
                     Err(e) => {
                         println!("Error: {}", e);

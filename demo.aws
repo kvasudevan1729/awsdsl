@@ -5,10 +5,24 @@ aws {
   ec2 {
     // some comment
     // more comment
-    name = "my-ec2"
-    description = "my ec2 instance demo"
+    name = "web01"
+    description = "web01 instance"
     count = 1
     app_version = 2.1
     image = "ubuntu"
+  }
+  ec2 {
+    name = "app01"
+    description = "app01 instance"
+    count = 1
+    app_version = 2.1
+    image = "ubuntu"
+  }
+  ec2 {
+    name = "db"
+    description = "db instances"
+    count = 2
+    app_version = 18.1
+    image = "ubuntu-postgres"
   }
 }
