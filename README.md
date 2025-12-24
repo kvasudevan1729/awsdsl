@@ -1,6 +1,6 @@
 # AwsDSL Overview
 
-A simple DSL to create resources in AWS. A recursive descent parser is used for
+A simple DSL (https://en.wikipedia.org/wiki/Domain-specific_language) to create resources in AWS. A recursive descent parser is used for
 parsing and Rust SDK is used to make the necessary API calls.
 
 At present, in any infrastructure stack of considerable size, many different
