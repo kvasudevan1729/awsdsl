@@ -70,7 +70,7 @@ impl fmt::Display for TokenType {
     }
 }
 
-static KEYWORDS: [&str; 9] = [
+static KEYWORDS: [&str; 13] = [
     "aws",
     "ec2",
     "ec2_id",
@@ -79,6 +79,10 @@ static KEYWORDS: [&str; 9] = [
     "count",
     "app_version",
     "image",
+    "ami",
+    "subnet_id",
+    "instance_type",
+    "sg_id",
     "region",
 ];
 
@@ -199,16 +203,16 @@ impl Scanner {
             match c {
                 Some('\n') => {
                     self.line += 1;
-                    println!("n, {}", self.column_no);
+                    // println!("n, {}", self.column_no);
                     self.column_no = 0;
                 }
                 Some('\r') => {
                     self.line += 1;
-                    println!("r, {}", self.column_no);
+                    // println!("r, {}", self.column_no);
                     self.column_no = 0;
                 }
                 Some('"') => {
-                    println!("\nend of quote, {}", self.column_no);
+                    // println!("\nend of quote, {}", self.column_no);
                     return;
                 }
                 _ => {}
@@ -359,14 +363,15 @@ impl Scanner {
             }
             // handle string literal
             Some('"') => {
+                //TODO: lose the double quotes at both ends?
                 self.read_until_eo_quote();
                 let literal = &self.contents[self.start + 1..self.current - 1];
                 self.add_token(TokenType::StringLiteral, Some(literal.to_string()));
-                println!("\nquote, final: {}", self.column_no);
-                println!(
-                    "after quote: *{}*",
-                    &self.contents[self.current - 1..self.current + 1]
-                );
+                // println!("\nquote, final: {}", self.colu
+                // println!(
+                //     "after quote: *{}*",
+                //     &self.contents[self.current - 1..self.current + 1]
+                // );
                 //self.current += 1;
             }
             // handle whitespace and CRLF
@@ -375,21 +380,21 @@ impl Scanner {
             Some('\r') => {
                 self.line += 1;
                 self.column_no = 1;
-                println!("main r, final: {}", self.column_no);
+                // println!("main r, final: {}", self.column_no);
             }
             Some('\n') => {
                 self.line += 1;
                 self.column_no = 1;
-                println!("main n, final: {}", self.column_no);
+                // println!("main n, final: {}", self.column_no);
             }
             _ => {
                 // the rest we handle here:
                 // numbers, keywords and identifiers
                 // identifiers don't start with digits, so if a lexeme starts
                 // with a digit, then it is a number
-                println!("other: {}", self.column_no);
+                // println!("other: {}", self.column_no);
                 if let Some(x) = c {
-                    println!("other inside: {}", self.column_no);
+                    // println!("other inside: {}", self.column_no);
                     if x.is_numeric() {
                         self.scan_number();
                         self.current -= 1;
@@ -404,15 +409,15 @@ impl Scanner {
                         // start with a digit.
                         self.scan_lexeme_with_underscore();
                         let s = &self.contents[self.start..self.current - 1];
-                        println!("s: {}", s);
+                        // println!("s: {}", s);
                         if KEYWORDS.contains(&s) {
                             self.current -= 1;
-                            println!("==> adding keyword!");
+                            // println!("==> adding keyword!");
                             self.add_token(TokenType::Keyword, Some(s.to_string()));
                             self.current += 1;
                         } else {
                             self.current -= 1;
-                            println!("==> adding identifier!");
+                            // println!("==> adding identifier!");
                             self.add_token(TokenType::Identifier, Some(s.to_string()));
                             self.current += 1;
                         }
@@ -507,7 +512,7 @@ mod tests {
                 _ => None,
             })
             .collect::<Vec<&str>>();
-        println!("kword_tokens: {:?}", kword_tokens);
+        // println!("kword_tokens: {:?}", kword_tokens);
         assert_eq!(kword_tokens.get(2), Some(&"ec2_id"));
     }
 

@@ -1,28 +1,17 @@
 aws {
   region = "eu-west-1"
-  name = "eu aws"
+  name = "eu west kv"
   description = "eu west env"
   ec2 {
     // some comment
     // more comment
     name = "web01"
     description = "web01 instance"
+    instance_type = "t2.micro"
     count = 1
     app_version = 2.1
-    image = "ubuntu"
-  }
-  ec2 {
-    name = "app01"
-    description = "app01 instance"
-    count = 1
-    app_version = 2.1
-    image = "ubuntu"
-  }
-  ec2 {
-    name = "db"
-    description = "db instances"
-    count = 2
-    app_version = 18.1
-    image = "ubuntu-postgres"
+    ami = "ami-01720b5f421cf0179"
+    subnet_id = "subnet-d79d17b1"
+    sg_id = "sg-0dfa7c71"
   }
 }
