@@ -7,10 +7,8 @@ pub(crate) struct AstError {
 }
 
 impl AstError {
-    pub(crate) fn new(msg: &str) -> Self {
-        Self {
-            msg: msg.to_string(),
-        }
+    pub(crate) fn new(msg: impl std::convert::Into<String>) -> Self {
+        Self { msg: msg.into() }
     }
 }
 

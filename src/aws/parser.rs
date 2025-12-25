@@ -3,24 +3,38 @@ use std::fmt;
 use crate::aws::nodes::{AwsNode, Ec2Node};
 use crate::lex::{Token, TokenType};
 
-#[derive(Debug)]
+pub(crate) enum ParseErrorType {
+    TokenMismatch,
+    UnknownToken,
+}
+
+impl fmt::Display for ParseErrorType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let s: String = match self {
+            Self::TokenMismatch => String::from("Token mismatch"),
+            Self::UnknownToken => String::from("Unknown token"),
+        };
+        write!(f, "{}", s)
+    }
+}
+
 pub(crate) struct ParseError {
-    err_type: String,
-    message: String,
+    err_type: ParseErrorType,
+    msg: String,
 }
 
 impl ParseError {
-    pub(crate) fn new(err_type: String, msg: String) -> Self {
+    pub(crate) fn new(err_type: ParseErrorType, msg: impl std::convert::Into<String>) -> Self {
         ParseError {
             err_type: err_type,
-            message: msg,
+            msg: msg.into(),
         }
     }
 }
 
 impl fmt::Display for ParseError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "error type: {}, mesg: {}", self.err_type, self.message)
+        write!(f, "error type: {}, details: {}", self.err_type, self.msg)
     }
 }
 
@@ -52,46 +66,40 @@ impl<'a> Parser<'a> {
     /// check if the current pointer matches with token provided
     fn check_token(&mut self, tok_type: TokenType) -> Result<(), ParseError> {
         if let Some(n) = self.peek() {
-            // println!("tok_type: {}", tok_type);
             if n.token_type == tok_type {
                 self.current += 1;
                 return Ok(());
             }
         }
+        let tok = self.peek().unwrap();
         let s = format!(
-            "token error:: expecting {}, found token: {}",
-            tok_type,
-            self.peek().unwrap()
+            "Expecting {} at location ({},{}, but found: {}",
+            tok_type, tok.line_no, tok.column_no, tok.lexeme
         );
-        Err(ParseError::new("token error".to_string(), s))
+        Err(ParseError::new(ParseErrorType::TokenMismatch, s))
     }
 
     /// parse starts from aws block
     pub(crate) fn parse(&mut self) -> Result<AwsNode, ParseError> {
-        println!("==> parsing the tokens ...");
-        match self.next() {
-            Some(n) => {
-                if n.lexeme == "aws" {
-                    self.aws()
-                } else {
-                    Err(ParseError::new(
-                        "aws_error".to_string(),
-                        "Not an aws constuct".to_string(),
-                    ))
-                }
+        println!("==> parse the tokens ...");
+        if let Some(n) = self.next() {
+            if n.lexeme == "aws" {
+                return self.aws();
             }
-            _ => Err(ParseError {
-                err_type: "aws_error".to_string(),
-                message: "Not an aws constuct".to_string(),
-            }),
         }
+
+        let tok = self.peek().unwrap();
+        let s = format!(
+            "Expecting {} at location ({},{}, but found: {}",
+            "aws", tok.line_no, tok.column_no, tok.lexeme
+        );
+        Err(ParseError::new(ParseErrorType::TokenMismatch, s))
     }
 
     /// Parse aws block, expects one of name, description, region or ec2 block
     pub(crate) fn aws(&mut self) -> Result<AwsNode, ParseError> {
         let mut aws_node = AwsNode::new("aws".to_string());
         self.check_token(TokenType::LeftBrace)?;
-        // parse attributes - name, region, ec2 ...
         while let Some(aws_attr) = self.next() {
             match aws_attr.token_type {
                 TokenType::Keyword => match aws_attr.lexeme.as_str() {
@@ -108,21 +116,31 @@ impl<'a> Parser<'a> {
                         self.ec2(&mut aws_node)?;
                     }
                     _ => {
-                        let s = format!("Unexpected keyword: {}", aws_attr.lexeme);
-                        return Err(ParseError::new("Unexpected keyword".to_string(), s));
+                        let s = format!(
+                            "Invalid token {} at location ({},{})",
+                            aws_attr.lexeme, aws_attr.line_no, aws_attr.column_no
+                        );
+                        return Err(ParseError::new(ParseErrorType::UnknownToken, s));
                     }
                 },
                 TokenType::RightBrace => {
                     return Ok(aws_node);
                 }
                 _ => {
-                    let msg = format!("Invalid token '{}'", aws_attr.token_type);
-                    return Err(ParseError::new("".to_string(), msg));
+                    let s = format!(
+                        "Invalid token {} at location ({},{})",
+                        aws_attr.lexeme, aws_attr.line_no, aws_attr.column_no
+                    );
+                    return Err(ParseError::new(ParseErrorType::UnknownToken, s));
                 }
             }
         }
-
-        Err(ParseError::new("".to_string(), "".to_string()))
+        let tok = self.peek().unwrap();
+        let s = format!(
+            "Error parsing token {} at location ({},{})",
+            tok.lexeme, tok.line_no, tok.column_no
+        );
+        return Err(ParseError::new(ParseErrorType::UnknownToken, s));
     }
 
     /// parse the name statement after `name` keyword
@@ -131,16 +149,19 @@ impl<'a> Parser<'a> {
         if let Some(tok) = self.next() {
             match tok.token_type {
                 TokenType::StringLiteral => {
-                    aws_node.set_name(tok.lexeme.trim_matches('"').to_string());
+                    aws_node.set_name(tok.lexeme.trim_matches('"'));
                     return Ok(());
                 }
                 _ => {}
             }
         }
-        Err(ParseError::new(
-            "token error".to_string(),
-            "expecting aws name!".to_string(),
-        ))
+
+        let c_tok = self.peek().unwrap();
+        let s = format!(
+            "Expecting a String literal token at location ({},{}), but found: {}",
+            c_tok.line_no, c_tok.column_no, c_tok.lexeme
+        );
+        Err(ParseError::new(ParseErrorType::TokenMismatch, s))
     }
 
     fn aws_description(&mut self, aws_node: &mut AwsNode) -> Result<(), ParseError> {
@@ -148,16 +169,18 @@ impl<'a> Parser<'a> {
         if let Some(tok) = self.next() {
             match tok.token_type {
                 TokenType::StringLiteral => {
-                    aws_node.set_description(tok.lexeme.trim_matches('"').to_string());
+                    aws_node.set_description(tok.lexeme.trim_matches('"'));
                     return Ok(());
                 }
                 _ => {}
             }
         }
-        Err(ParseError::new(
-            "token error".to_string(),
-            "expecting aws description!".to_string(),
-        ))
+        let c_tok = self.peek().unwrap();
+        let s = format!(
+            "Expecting a String literal token at location ({},{}), but found: {}",
+            c_tok.line_no, c_tok.column_no, c_tok.lexeme
+        );
+        Err(ParseError::new(ParseErrorType::TokenMismatch, s))
     }
 
     fn aws_region(&mut self, aws_node: &mut AwsNode) -> Result<(), ParseError> {
@@ -165,20 +188,21 @@ impl<'a> Parser<'a> {
         if let Some(tok) = self.next() {
             match tok.token_type {
                 TokenType::StringLiteral => {
-                    aws_node.set_region(tok.lexeme.trim_matches('"').to_string());
+                    aws_node.set_region(tok.lexeme.trim_matches('"'));
                     return Ok(());
                 }
                 _ => {}
             }
         }
-        Err(ParseError::new(
-            "bad region".to_string(),
-            "bad region".to_string(),
-        ))
+        let c_tok = self.peek().unwrap();
+        let s = format!(
+            "Expecting a String literal token at location ({},{}), but found: {}",
+            c_tok.line_no, c_tok.column_no, c_tok.lexeme
+        );
+        Err(ParseError::new(ParseErrorType::TokenMismatch, s))
     }
 
     fn ec2(&mut self, aws_node: &mut AwsNode) -> Result<(), ParseError> {
-        // println!("ec2: {}", self.peek().unwrap());
         self.check_token(TokenType::LeftBrace)?;
         let mut ec2 = Ec2Node::new();
 
@@ -210,8 +234,11 @@ impl<'a> Parser<'a> {
                         self.ec2_app_version(&mut ec2)?;
                     }
                     _ => {
-                        let s = format!("Unexpected keyword: {}", ec2_attr.lexeme);
-                        return Err(ParseError::new("Unexpected keyword".to_string(), s));
+                        let s = format!(
+                            "Invalid token {} at location ({},{})",
+                            ec2_attr.lexeme, ec2_attr.line_no, ec2_attr.column_no
+                        );
+                        return Err(ParseError::new(ParseErrorType::UnknownToken, s));
                     }
                 },
                 TokenType::Comment => {}
@@ -221,18 +248,20 @@ impl<'a> Parser<'a> {
                 }
                 _ => {
                     let s = format!(
-                        "Unexpected token type {} lexeme '{}' at line, pos: {},{}",
-                        ec2_attr.token_type, ec2_attr.lexeme, ec2_attr.line_no, ec2_attr.column_no
+                        "Invalid token {} at location ({},{})",
+                        ec2_attr.lexeme, ec2_attr.line_no, ec2_attr.column_no
                     );
-                    return Err(ParseError::new("parse error".to_string(), s));
+                    return Err(ParseError::new(ParseErrorType::UnknownToken, s));
                 }
             }
         }
 
-        Err(ParseError::new(
-            "token error".to_string(),
-            "Unexpected ec2".to_string(),
-        ))
+        let tok = self.peek().unwrap();
+        let s = format!(
+            "Error parsing token {} at location ({},{})",
+            tok.lexeme, tok.line_no, tok.column_no
+        );
+        return Err(ParseError::new(ParseErrorType::UnknownToken, s));
     }
 
     fn ec2_name(&mut self, ec2_node: &mut Ec2Node) -> Result<(), ParseError> {
@@ -246,10 +275,12 @@ impl<'a> Parser<'a> {
                 _ => {}
             }
         }
-        Err(ParseError::new(
-            "token error".to_string(),
-            "expecting ec2 name!".to_string(),
-        ))
+        let c_tok = self.peek().unwrap();
+        let s = format!(
+            "Expecting a String literal token at location ({},{}), but found: {}",
+            c_tok.line_no, c_tok.column_no, c_tok.lexeme
+        );
+        Err(ParseError::new(ParseErrorType::TokenMismatch, s))
     }
 
     fn ec2_description(&mut self, ec2_node: &mut Ec2Node) -> Result<(), ParseError> {
@@ -263,10 +294,12 @@ impl<'a> Parser<'a> {
                 _ => {}
             }
         }
-        Err(ParseError::new(
-            "token error".to_string(),
-            "expecting ec2 description!".to_string(),
-        ))
+        let c_tok = self.peek().unwrap();
+        let s = format!(
+            "Expecting a String literal token at location ({},{}), but found: {}",
+            c_tok.line_no, c_tok.column_no, c_tok.lexeme
+        );
+        Err(ParseError::new(ParseErrorType::TokenMismatch, s))
     }
 
     fn ec2_instance_type(&mut self, ec2_node: &mut Ec2Node) -> Result<(), ParseError> {
@@ -280,10 +313,12 @@ impl<'a> Parser<'a> {
                 _ => {}
             }
         }
-        Err(ParseError::new(
-            "token error".to_string(),
-            "expecting ec2 description!".to_string(),
-        ))
+        let c_tok = self.peek().unwrap();
+        let s = format!(
+            "Expecting a String literal token at location ({},{}), but found: {}",
+            c_tok.line_no, c_tok.column_no, c_tok.lexeme
+        );
+        Err(ParseError::new(ParseErrorType::TokenMismatch, s))
     }
 
     fn ec2_ami(&mut self, ec2_node: &mut Ec2Node) -> Result<(), ParseError> {
@@ -297,10 +332,12 @@ impl<'a> Parser<'a> {
                 _ => {}
             }
         }
-        Err(ParseError::new(
-            "token error".to_string(),
-            "expecting ec2 image!".to_string(),
-        ))
+        let c_tok = self.peek().unwrap();
+        let s = format!(
+            "Expecting a String literal token at location ({},{}), but found: {}",
+            c_tok.line_no, c_tok.column_no, c_tok.lexeme
+        );
+        Err(ParseError::new(ParseErrorType::TokenMismatch, s))
     }
 
     fn ec2_subnet_id(&mut self, ec2_node: &mut Ec2Node) -> Result<(), ParseError> {
@@ -314,10 +351,12 @@ impl<'a> Parser<'a> {
                 _ => {}
             }
         }
-        Err(ParseError::new(
-            "token error".to_string(),
-            "expecting ec2 subnet_id!".to_string(),
-        ))
+        let c_tok = self.peek().unwrap();
+        let s = format!(
+            "Expecting a String literal token at location ({},{}), but found: {}",
+            c_tok.line_no, c_tok.column_no, c_tok.lexeme
+        );
+        Err(ParseError::new(ParseErrorType::TokenMismatch, s))
     }
 
     fn ec2_sg_id(&mut self, ec2_node: &mut Ec2Node) -> Result<(), ParseError> {
@@ -331,10 +370,12 @@ impl<'a> Parser<'a> {
                 _ => {}
             }
         }
-        Err(ParseError::new(
-            "token error".to_string(),
-            "expecting ec2 security group id!".to_string(),
-        ))
+        let c_tok = self.peek().unwrap();
+        let s = format!(
+            "Expecting a String literal token at location ({},{}), but found: {}",
+            c_tok.line_no, c_tok.column_no, c_tok.lexeme
+        );
+        Err(ParseError::new(ParseErrorType::TokenMismatch, s))
     }
 
     fn ec2_count(&mut self, ec2_node: &mut Ec2Node) -> Result<(), ParseError> {
@@ -348,10 +389,12 @@ impl<'a> Parser<'a> {
                 _ => {}
             }
         }
-        Err(ParseError::new(
-            "token error".to_string(),
-            "expecting ec2 count!".to_string(),
-        ))
+        let c_tok = self.peek().unwrap();
+        let s = format!(
+            "Expecting a String literal token at location ({},{}), but found: {}",
+            c_tok.line_no, c_tok.column_no, c_tok.lexeme
+        );
+        Err(ParseError::new(ParseErrorType::TokenMismatch, s))
     }
 
     fn ec2_app_version(&mut self, ec2_node: &mut Ec2Node) -> Result<(), ParseError> {
@@ -365,9 +408,11 @@ impl<'a> Parser<'a> {
                 _ => {}
             }
         }
-        Err(ParseError::new(
-            "token error".to_string(),
-            "expecting ec2 count!".to_string(),
-        ))
+        let c_tok = self.peek().unwrap();
+        let s = format!(
+            "Expecting a String literal token at location ({},{}), but found: {}",
+            c_tok.line_no, c_tok.column_no, c_tok.lexeme
+        );
+        Err(ParseError::new(ParseErrorType::TokenMismatch, s))
     }
 }

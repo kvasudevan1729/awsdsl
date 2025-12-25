@@ -21,16 +21,16 @@ impl AwsNode {
         }
     }
 
-    pub(crate) fn set_name(&mut self, name: String) {
-        self.name = Some(name);
+    pub(crate) fn set_name(&mut self, name: impl std::convert::Into<String>) {
+        self.name = Some(name.into());
     }
 
-    pub(crate) fn set_description(&mut self, description: String) {
-        self.description = Some(description);
+    pub(crate) fn set_description(&mut self, description: impl std::convert::Into<String>) {
+        self.description = Some(description.into());
     }
 
-    pub(crate) fn set_region(&mut self, region: String) {
-        self.region = Some(region);
+    pub(crate) fn set_region(&mut self, region: impl std::convert::Into<String>) {
+        self.region = Some(region.into());
     }
 
     pub(crate) fn add_ec2(&mut self, ec2: Ec2Node) {
@@ -111,29 +111,30 @@ impl Ec2Node {
         }
     }
 
-    pub(crate) fn set_name(&mut self, name: String) {
-        self.id = Some((&name).clone());
-        self.name = Some(name);
+    pub(crate) fn set_name(&mut self, name: impl std::convert::Into<String>) {
+        let s = name.into();
+        self.id = Some(s.clone());
+        self.name = Some(s);
     }
 
-    pub(crate) fn set_description(&mut self, description: String) {
-        self.description = Some(description);
+    pub(crate) fn set_description(&mut self, description: impl std::convert::Into<String>) {
+        self.description = Some(description.into());
     }
 
-    pub(crate) fn set_instance_type(&mut self, instance_type: String) {
-        self.instance_type = Some(instance_type);
+    pub(crate) fn set_instance_type(&mut self, instance_type: impl std::convert::Into<String>) {
+        self.instance_type = Some(instance_type.into());
     }
 
-    pub(crate) fn set_ami(&mut self, ami: String) {
-        self.ami = Some(ami);
+    pub(crate) fn set_ami(&mut self, ami: impl std::convert::Into<String>) {
+        self.ami = Some(ami.into());
     }
 
-    pub(crate) fn set_subnet_id(&mut self, subnet_id: String) {
-        self.subnet_id = Some(subnet_id);
+    pub(crate) fn set_subnet_id(&mut self, subnet_id: impl std::convert::Into<String>) {
+        self.subnet_id = Some(subnet_id.into());
     }
 
-    pub(crate) fn set_sg_id(&mut self, sg_id: String) {
-        self.sg_id = Some(sg_id);
+    pub(crate) fn set_sg_id(&mut self, sg_id: impl std::convert::Into<String>) {
+        self.sg_id = Some(sg_id.into());
     }
 
     pub(crate) fn set_count(&mut self, count: u8) {

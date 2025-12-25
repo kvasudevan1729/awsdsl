@@ -28,7 +28,7 @@ async fn main() {
                         println!("\nparse tree:\n{}", aws_node.print_ast(2));
                         match symbols::walk_ast(&aws_node) {
                             Ok(aws_sym) => {
-                                println!("Aws symbol:{}", aws_sym);
+                                println!("Aws resources:{}", aws_sym);
                                 match actions::apply_aws(&aws_sym).await {
                                     Ok(_) => {}
                                     Err(e) => {
