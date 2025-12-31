@@ -13,5 +13,6 @@ aws {
     ami = "ami-01720b5f421cf0179"
     subnet_id = "subnet-d79d17b1"
     sg_id = "sg-0dfa7c71"
+    key_name = "krish_rsa_new"
   }
 }

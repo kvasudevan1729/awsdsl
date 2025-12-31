@@ -1,7 +1,9 @@
+use std::error::Error;
 use std::fmt;
 
 use crate::aws::{AwsSym, Ec2Sym, nodes};
 
+#[derive(Debug)]
 pub(crate) struct AstError {
     msg: String,
 }
@@ -11,6 +13,8 @@ impl AstError {
         Self { msg: msg.into() }
     }
 }
+
+impl Error for AstError {}
 
 impl fmt::Display for AstError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -59,6 +63,11 @@ pub(crate) fn walk_ast(aws_node: &nodes::AwsNode) -> Result<AwsSym, AstError> {
             ),
             ec2.app_version,
             ec2.count,
+            String::from(
+                ec2.key_name
+                    .as_ref()
+                    .ok_or(AstError::new("No key name provided!"))?,
+            ),
         );
         aws_sym.add_ec2(ec2_sym);
     }

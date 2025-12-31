@@ -94,6 +94,7 @@ pub(crate) struct Ec2Node {
     pub(crate) ami: Option<String>,
     pub(crate) subnet_id: Option<String>,
     pub(crate) sg_id: Option<String>,
+    pub(crate) key_name: Option<String>,
 }
 
 impl Ec2Node {
@@ -108,6 +109,7 @@ impl Ec2Node {
             app_version: 0.0,
             subnet_id: None,
             sg_id: None,
+            key_name: None,
         }
     }
 
@@ -143,6 +145,10 @@ impl Ec2Node {
 
     pub(crate) fn set_app_version(&mut self, app_version: f32) {
         self.app_version = app_version;
+    }
+
+    pub(crate) fn set_key_name(&mut self, key_name: impl std::convert::Into<String>) {
+        self.key_name = Some(key_name.into());
     }
 }
 

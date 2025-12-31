@@ -23,11 +23,12 @@ pub(crate) async fn show_instances(config: &SdkConfig) -> Result<(), Error> {
 
 pub(crate) async fn create_instance(
     config: &SdkConfig,
-    name: &str,
+    name: impl std::convert::Into<String> + std::fmt::Display,
     ami_id: &str,
     count: i32,
     ec2_size: InstanceType,
     subnet_id: &str,
+    key_name: &str,
     sg_ids: Vec<&str>,
 ) -> Result<(), Error> {
     let client = Client::new(&config);
@@ -37,6 +38,7 @@ pub(crate) async fn create_instance(
         .instance_type(ec2_size)
         .subnet_id(subnet_id)
         .set_security_group_ids(Some(sg_ids.iter().map(|x| x.to_string()).collect()))
+        .set_key_name(Some(key_name.to_string()))
         .min_count(count)
         .max_count(count)
         .send()
@@ -55,7 +57,7 @@ pub(crate) async fn create_instance(
                 inst_ids.push(inst_id.to_string());
 
                 // create tag
-                let tag_name = format!("awsdsl - {}", name);
+                let tag_name = format!("awsdsl - {}", name.to_string());
                 let tag_response = client
                     .create_tags()
                     .resources(inst_id)

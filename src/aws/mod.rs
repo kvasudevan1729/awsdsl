@@ -46,11 +46,25 @@ pub(crate) struct Ec2Sym {
     pub(crate) sg_id: String,
     pub(crate) app_version: f32,
     pub(crate) count: u8,
+    pub(crate) key_name: String,
 }
 
 impl fmt::Display for Ec2Sym {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "[{}], name: {}", self.id, self.name)
+    }
+}
+
+impl fmt::Debug for Ec2Sym {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let mut s = format!(" - {}", self.name);
+        s = format!("{}\n - {}", s, self.name);
+        s = format!("{}\n - {}", s, self.desc);
+        s = format!("{}\n - {}", s, self.instance_type);
+        s = format!("{}\n - {}", s, self.ami_id);
+        s = format!("{}\n - {}", s, self.subnet_id);
+        s = format!("{}\n - {}", s, self.sg_id);
+        write!(f, "[{}], name: {}", self.id, s)
     }
 }
 
@@ -64,6 +78,7 @@ impl Ec2Sym {
         sg_id: String,
         app_version: f32,
         count: u8,
+        key_name: String,
     ) -> Self {
         Ec2Sym {
             id: (&name).to_string(),
@@ -75,6 +90,7 @@ impl Ec2Sym {
             sg_id: sg_id,
             app_version: app_version,
             count: count,
+            key_name: key_name,
         }
     }
 }

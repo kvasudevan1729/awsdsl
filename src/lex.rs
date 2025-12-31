@@ -70,7 +70,7 @@ impl fmt::Display for TokenType {
     }
 }
 
-static KEYWORDS: [&str; 13] = [
+static KEYWORDS: [&str; 14] = [
     "aws",
     "ec2",
     "ec2_id",
@@ -84,6 +84,7 @@ static KEYWORDS: [&str; 13] = [
     "instance_type",
     "sg_id",
     "region",
+    "key_name",
 ];
 
 pub(crate) struct Token {
@@ -268,9 +269,7 @@ impl Scanner {
 
     /// Start scanning the tokens from start
     pub(crate) fn scan_tokens(&mut self) {
-        // for tok in self.contents.split_ascii_whitespace().into_iter() {
-        //     println!("tok: {}", tok);
-        // }
+        println!("=> scanning tokens from {}", self.source);
         while self.current < self.contents.len() {
             self.start = self.current;
             self.scan_token();
