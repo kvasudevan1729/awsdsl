@@ -284,6 +284,22 @@ impl Scanner {
         self.tokens.push(eof_tok);
     }
 
+    // pub(crate) fn next_token(&mut self) -> Token {
+    //     if self.current < self.contents.len() {
+    //         self.start = self.current;
+    //         return self.scan_token();
+    //     }
+    //     let eof_tok = Token::new(
+    //         TokenType::EoF,
+    //         "".to_string(),
+    //         None,
+    //         self.line,
+    //         self.column_no,
+    //     );
+    //
+    //     return eof_tok;
+    // }
+
     /// Scan toke based on the `token_type`. For multi characters
     /// token, use `peek()`.
     /// TODO: handle errors

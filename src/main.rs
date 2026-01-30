@@ -8,8 +8,6 @@ mod aws;
 mod lex;
 mod symbols;
 
-use aws::parser::Parser;
-
 #[tokio::main]
 async fn main() {
     let args: Vec<String> = env::args().collect();
@@ -24,7 +22,7 @@ async fn main() {
                 if my_scanner.errors.len() > 0 {
                     error(0, "Lexer had errors!");
                 }
-                let mut aws_parser = Parser::new(my_scanner.tokens.as_ref());
+                let mut aws_parser = aws::parser::Parser::new(my_scanner.tokens.as_ref());
                 match aws_parser.parse() {
                     Ok(aws_node) => {
                         println!("\nparse tree:\n{}", aws_node.print_ast(2));
@@ -34,7 +32,7 @@ async fn main() {
                                 match actions::apply_aws(&aws_sym).await {
                                     Ok(_) => {}
                                     Err(e) => {
-                                        eprintln!("Error: {}", e);
+                                        eprintln!("Error: {}", e.show());
                                     }
                                 }
                             }

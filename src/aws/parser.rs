@@ -12,9 +12,9 @@ pub(crate) enum ParseErrorType {
 
 impl fmt::Display for ParseErrorType {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let s: String = match self {
-            Self::TokenMismatch => String::from("Token mismatch"),
-            Self::UnknownToken => String::from("Unknown token"),
+        let s = match self {
+            Self::TokenMismatch => "Token mismatch",
+            Self::UnknownToken => "Unknown token",
         };
         write!(f, "{}", s)
     }
@@ -87,6 +87,9 @@ impl<'a> Parser<'a> {
     /// parse starts from aws block
     pub(crate) fn parse(&mut self) -> Result<AwsNode, ParseError> {
         println!("==> parse the tokens ...");
+        // next should get next token from lexer
+        // so as and when needed
+        // TODO
         if let Some(n) = self.next() {
             if n.lexeme == "aws" {
                 return self.aws();

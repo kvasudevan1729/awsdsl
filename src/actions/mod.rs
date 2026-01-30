@@ -15,6 +15,15 @@ pub(crate) enum AwsErrorType {
     EC2Deploy,
 }
 
+impl fmt::Display for AwsErrorType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let s = match self {
+            Self::EC2Deploy => "ec2 deploy",
+        };
+        write!(f, "{}", s)
+    }
+}
+
 #[derive(Debug)]
 pub(crate) struct AwsDeployError {
     err_type: AwsErrorType,
@@ -29,6 +38,9 @@ impl AwsDeployError {
             err_type: err_type,
             message: msg.into(),
         }
+    }
+    pub(crate) fn show(&self) -> String {
+        format!("[{}] {}", self.err_type, self.message)
     }
 }
 
