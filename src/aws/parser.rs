@@ -161,12 +161,12 @@ impl Parser {
                         "Invalid token at location ({},{}), found: {}",
                         tok.line_no, tok.column_no, tok.lexeme
                     );
-                    return Err(ParseError::new(ParseErrorType::TokenMismatch, s));
+                    return error(&&self.scanner, ParseErrorType::TokenMismatch, Some(s));
                 }
             }
         }
 
-        error(&self.scanner, ParseErrorType::TokenMismatch)
+        error(&self.scanner, ParseErrorType::TokenMismatch, None)
     }
 
     fn aws_description(&mut self, aws_node: &mut AwsNode) -> Result<(), ParseError> {
@@ -182,12 +182,12 @@ impl Parser {
                         "Invalid token at location ({},{}), found: {}",
                         tok.line_no, tok.column_no, tok.lexeme
                     );
-                    return Err(ParseError::new(ParseErrorType::TokenMismatch, s));
+                    return error(&&self.scanner, ParseErrorType::TokenMismatch, Some(s));
                 }
             }
         }
 
-        error(&self.scanner, ParseErrorType::TokenMismatch)
+        error(&self.scanner, ParseErrorType::TokenMismatch, None)
     }
 
     fn aws_region(&mut self, aws_node: &mut AwsNode) -> Result<(), ParseError> {
@@ -203,12 +203,12 @@ impl Parser {
                         "Invalid token at location ({},{}), found: {}",
                         tok.line_no, tok.column_no, tok.lexeme
                     );
-                    return Err(ParseError::new(ParseErrorType::TokenMismatch, s));
+                    return error(&&self.scanner, ParseErrorType::TokenMismatch, Some(s));
                 }
             }
         }
 
-        error(&self.scanner, ParseErrorType::TokenMismatch)
+        error(&self.scanner, ParseErrorType::TokenMismatch, None)
     }
 
     fn ec2(&mut self, aws_node: &mut AwsNode) -> Result<(), ParseError> {
@@ -268,7 +268,7 @@ impl Parser {
             }
         }
 
-        error(&self.scanner, ParseErrorType::TokenMismatch)
+        error(&self.scanner, ParseErrorType::TokenMismatch, None)
     }
 
     fn ec2_name(&mut self, ec2_node: &mut Ec2Node) -> Result<(), ParseError> {
@@ -284,12 +284,12 @@ impl Parser {
                         "Invalid token at location ({},{}), found: {}",
                         tok.line_no, tok.column_no, tok.lexeme
                     );
-                    return Err(ParseError::new(ParseErrorType::TokenMismatch, s));
+                    return error(&&self.scanner, ParseErrorType::TokenMismatch, Some(s));
                 }
             }
         }
 
-        error(&self.scanner, ParseErrorType::TokenMismatch)
+        error(&self.scanner, ParseErrorType::TokenMismatch, None)
     }
 
     fn ec2_description(&mut self, ec2_node: &mut Ec2Node) -> Result<(), ParseError> {
@@ -305,12 +305,12 @@ impl Parser {
                         "Invalid token at location ({},{}), found: {}",
                         tok.line_no, tok.column_no, tok.lexeme
                     );
-                    return Err(ParseError::new(ParseErrorType::TokenMismatch, s));
+                    return error(&&self.scanner, ParseErrorType::TokenMismatch, Some(s));
                 }
             }
         }
 
-        error(&self.scanner, ParseErrorType::TokenMismatch)
+        error(&self.scanner, ParseErrorType::TokenMismatch, None)
     }
 
     fn ec2_instance_type(&mut self, ec2_node: &mut Ec2Node) -> Result<(), ParseError> {
@@ -326,26 +326,15 @@ impl Parser {
                         "Invalid token at location ({},{}), found: {}",
                         tok.line_no, tok.column_no, tok.lexeme
                     );
-                    return Err(ParseError::new(ParseErrorType::TokenMismatch, s));
+                    return error(&&self.scanner, ParseErrorType::TokenMismatch, Some(s));
                 }
             }
         }
 
-        error(&self.scanner, ParseErrorType::TokenMismatch)
+        error(&self.scanner, ParseErrorType::TokenMismatch, None)
     }
 
     fn ec2_ami(&mut self, ec2_node: &mut Ec2Node) -> Result<(), ParseError> {
-        // self.check_token(TokenType::Equal)?;
-        // let Some(tok) = self.next() else {
-        //     return error(ParseErrorType::UnknownToken, None);
-        // };
-        // match tok.token_type {
-        //     TokenType::StringLiteral => {
-        //         ec2_node.set_ami(tok.lexeme.trim_matches('"').to_string());
-        //         return Ok(());
-        //     }
-        //     _ => error(ParseErrorType::TokenMismatch, Some(&tok)),
-        // }
         while let Some(tok) = self.next() {
             match tok.token_type {
                 TokenType::Equal => {}
@@ -358,12 +347,12 @@ impl Parser {
                         "Invalid token at location ({},{}), found: {}",
                         tok.line_no, tok.column_no, tok.lexeme
                     );
-                    return Err(ParseError::new(ParseErrorType::TokenMismatch, s));
+                    return error(&&self.scanner, ParseErrorType::TokenMismatch, Some(s));
                 }
             }
         }
 
-        error(&self.scanner, ParseErrorType::TokenMismatch)
+        error(&self.scanner, ParseErrorType::TokenMismatch, None)
     }
 
     fn ec2_subnet_id(&mut self, ec2_node: &mut Ec2Node) -> Result<(), ParseError> {
@@ -379,12 +368,12 @@ impl Parser {
                         "Invalid token at location ({},{}), found: {}",
                         tok.line_no, tok.column_no, tok.lexeme
                     );
-                    return Err(ParseError::new(ParseErrorType::TokenMismatch, s));
+                    return error(&&self.scanner, ParseErrorType::TokenMismatch, Some(s));
                 }
             }
         }
 
-        error(&self.scanner, ParseErrorType::TokenMismatch)
+        error(&self.scanner, ParseErrorType::TokenMismatch, None)
     }
 
     fn ec2_sg_id(&mut self, ec2_node: &mut Ec2Node) -> Result<(), ParseError> {
@@ -400,12 +389,12 @@ impl Parser {
                         "Invalid token at location ({},{}), found: {}",
                         tok.line_no, tok.column_no, tok.lexeme
                     );
-                    return Err(ParseError::new(ParseErrorType::TokenMismatch, s));
+                    return error(&&self.scanner, ParseErrorType::TokenMismatch, Some(s));
                 }
             }
         }
 
-        error(&self.scanner, ParseErrorType::TokenMismatch)
+        error(&self.scanner, ParseErrorType::TokenMismatch, None)
     }
 
     fn ec2_count(&mut self, ec2_node: &mut Ec2Node) -> Result<(), ParseError> {
@@ -421,12 +410,12 @@ impl Parser {
                         "Invalid token at location ({},{}), found: {}",
                         tok.line_no, tok.column_no, tok.lexeme
                     );
-                    return Err(ParseError::new(ParseErrorType::TokenMismatch, s));
+                    return error(&&self.scanner, ParseErrorType::TokenMismatch, Some(s));
                 }
             }
         }
 
-        error(&self.scanner, ParseErrorType::TokenMismatch)
+        error(&self.scanner, ParseErrorType::TokenMismatch, None)
     }
 
     fn ec2_app_version(&mut self, ec2_node: &mut Ec2Node) -> Result<(), ParseError> {
@@ -442,12 +431,12 @@ impl Parser {
                         "Invalid token at location ({},{}), found: {}",
                         tok.line_no, tok.column_no, tok.lexeme
                     );
-                    return Err(ParseError::new(ParseErrorType::TokenMismatch, s));
+                    return error(&&self.scanner, ParseErrorType::TokenMismatch, Some(s));
                 }
             }
         }
 
-        error(&self.scanner, ParseErrorType::TokenMismatch)
+        error(&self.scanner, ParseErrorType::TokenMismatch, None)
     }
 
     fn ec2_key_name(&mut self, ec2_node: &mut Ec2Node) -> Result<(), ParseError> {
@@ -463,19 +452,28 @@ impl Parser {
                         "Invalid token at location ({},{}), found: {}",
                         tok.line_no, tok.column_no, tok.lexeme
                     );
-                    return Err(ParseError::new(ParseErrorType::TokenMismatch, s));
+                    return error(&&self.scanner, ParseErrorType::TokenMismatch, Some(s));
                 }
             }
         }
 
-        error(&self.scanner, ParseErrorType::TokenMismatch)
+        error(&self.scanner, ParseErrorType::TokenMismatch, None)
     }
 }
 
-pub(crate) fn error(scanr: &Scanner, err_type: ParseErrorType) -> Result<(), ParseError> {
-    let s = format!(
-        "Invalid token at (line,column): {},{}",
-        scanr.line, scanr.column_no
-    );
-    Err(ParseError::new(err_type, s))
+pub(crate) fn error(
+    scanr: &Scanner,
+    err_type: ParseErrorType,
+    msg: Option<String>,
+) -> Result<(), ParseError> {
+    match msg {
+        Some(s) => Err(ParseError::new(err_type, s)),
+        _ => {
+            let s = format!(
+                "Invalid token at (line,column): {},{}",
+                scanr.line, scanr.column_no
+            );
+            Err(ParseError::new(err_type, s))
+        }
+    }
 }
