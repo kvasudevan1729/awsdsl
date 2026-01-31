@@ -1,4 +1,5 @@
 // cfg for aws language
+// symbolic lex tokens: STR, INT, DECIMAL
 root: aws_stmt
 ;
 
@@ -11,10 +12,15 @@ ec2_block: EC2 "{" ec2_attrs "}"
 ec2_attrs: ec2_attrs ec2_attr
 ;
 
-ec2_attr: id_attr | name_attr | desc_attr | image_attr | count_attr
-;
-
-id_attr: ec2_id "=" NUMBER
+ec2_attr: 
+  name_attr
+  | desc_attr
+  | inst_type_attr
+  | image_attr
+  | count_attr
+  | subnet_id_attr
+  | security_group_id_attr
+  | key_name_attr
 ;
 
 name_attr: NAME "=" string_val
@@ -23,10 +29,22 @@ name_attr: NAME "=" string_val
 desc_attr: DESC "=" string_val
 ;
 
+inst_type_attr: INST_TYPE "=" string_val
+;
+
 image_attr: IMAGE "=" string_val
 ;
 
-count_attr: COUNT "=" string_val
+count_attr: COUNT "=" number_val
+;
+
+subnet_id_attr: SUBNET_ID '=' string_val
+;
+
+security_group_id_attr: SG_ID '=' string_val
+;
+
+number_val: INT | DECIMAL
 ;
 
 string_val: QUOTE STR QUOTE
