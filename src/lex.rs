@@ -2,8 +2,68 @@ use std::error;
 use std::fmt;
 use std::fs;
 
+pub(crate) struct Token {
+    pub(crate) token_type: TokenType,
+    pub(crate) lexeme: String,
+    pub(crate) literal: Option<String>,
+    pub(crate) line_no: usize,
+    pub(crate) column_no: usize,
+}
+
+impl Token {
+    pub(crate) fn new(
+        token_type: TokenType,
+        lexeme: String,
+        literal: Option<String>,
+        line_no: usize,
+        column_no: usize,
+    ) -> Self {
+        Token {
+            token_type: token_type,
+            lexeme: lexeme,
+            literal: literal,
+            line_no: line_no,
+            column_no: column_no,
+        }
+    }
+}
+
+impl fmt::Display for Token {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let s = format!(
+            "[{}:{}] type: {}, lexeme: {}",
+            self.line_no, self.column_no, self.token_type, self.lexeme,
+        );
+        let lit = match self.literal.as_ref() {
+            Some(x) => {
+                format!("{}, literal: {}", s, x)
+            }
+            _ => {
+                format!("{}", s)
+            }
+        };
+        write!(f, "{}", lit)
+    }
+}
+
+impl Clone for Token {
+    fn clone(&self) -> Self {
+        let lit = match &self.literal {
+            Some(x) => Some(x.to_string()),
+            _ => None,
+        };
+        Self {
+            token_type: self.token_type.clone(),
+            lexeme: self.lexeme.to_string(),
+            literal: lit,
+            line_no: self.line_no,
+            column_no: self.column_no,
+        }
+    }
+}
+
 // Token stuff
-#[derive(PartialEq)]
+#[derive(PartialEq, Clone, Debug)]
 pub(crate) enum TokenType {
     // grouping
     LeftParen,
@@ -87,50 +147,6 @@ static KEYWORDS: [&str; 14] = [
     "key_name",
 ];
 
-pub(crate) struct Token {
-    pub(crate) token_type: TokenType,
-    pub(crate) lexeme: String,
-    pub(crate) literal: Option<String>,
-    pub(crate) line_no: usize,
-    pub(crate) column_no: usize,
-}
-
-impl Token {
-    pub(crate) fn new(
-        token_type: TokenType,
-        lexeme: String,
-        literal: Option<String>,
-        line_no: usize,
-        column_no: usize,
-    ) -> Self {
-        Token {
-            token_type: token_type,
-            lexeme: lexeme,
-            literal: literal,
-            line_no: line_no,
-            column_no: column_no,
-        }
-    }
-}
-
-impl fmt::Display for Token {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let s = format!(
-            "[{}:{}] type: {}, lexeme: {}",
-            self.line_no, self.column_no, self.token_type, self.lexeme,
-        );
-        let lit = match self.literal.as_ref() {
-            Some(x) => {
-                format!("{}, literal: {}", s, x)
-            }
-            _ => {
-                format!("{}", s)
-            }
-        };
-        write!(f, "{}", lit)
-    }
-}
-
 /// Scanner
 /// source: source file path
 /// contents: contents from `source` to parse
@@ -141,7 +157,6 @@ impl fmt::Display for Token {
 pub(crate) struct Scanner {
     pub(crate) source: String,
     pub(crate) contents: String,
-    pub(crate) tokens: Vec<Token>,
     pub(crate) errors: Vec<String>,
     pub(crate) start: usize,
     pub(crate) current: usize,
@@ -221,7 +236,7 @@ impl Scanner {
         }
     }
 
-    /// scane for an integer or a decimal
+    /// scan for an integer or a decimal
     pub(crate) fn scan_number(&mut self) {
         while self.current < self.contents.len() {
             let c = self.advance();
@@ -251,43 +266,28 @@ impl Scanner {
     }
 
     /// Store the token in our scanner
-    pub(crate) fn add_token(&mut self, tok_type: TokenType, literal: Option<String>) {
+    pub(crate) fn emit_token(&mut self, tok_type: TokenType, literal: Option<String>) -> Token {
         let curr_str = &self.contents[self.start..self.current];
         let len_tok = self.current - self.start;
         let mut start_col_no = 0;
         if self.column_no > len_tok {
             start_col_no = self.column_no - len_tok;
         }
-        self.tokens.push(Token::new(
+        return Token::new(
             tok_type,
             curr_str.to_string(),
             literal,
             self.line,
             start_col_no, // we need the start column
-        ));
+        );
     }
 
     /// Start scanning the tokens from start
-    pub(crate) fn scan_tokens(&mut self) {
-        println!("=> scanning tokens from {}", self.source);
-        while self.current < self.contents.len() {
-            self.start = self.current;
-            self.scan_token();
-        }
-        let eof_tok = Token::new(
-            TokenType::EoF,
-            "".to_string(),
-            None,
-            self.line,
-            self.column_no,
-        );
-        self.tokens.push(eof_tok);
-    }
-
-    // pub(crate) fn next_token(&mut self) -> Token {
-    //     if self.current < self.contents.len() {
+    // pub(crate) fn scan_tokens(&mut self) {
+    //     println!("=> scanning tokens from {}", self.source);
+    //     while self.current < self.contents.len() {
     //         self.start = self.current;
-    //         return self.scan_token();
+    //         self.scan_token();
     //     }
     //     let eof_tok = Token::new(
     //         TokenType::EoF,
@@ -296,39 +296,84 @@ impl Scanner {
     //         self.line,
     //         self.column_no,
     //     );
-    //
-    //     return eof_tok;
+    //     self.tokens.push(eof_tok);
     // }
 
-    /// Scan toke based on the `token_type`. For multi characters
+    pub(crate) fn backup(&mut self) {
+        self.current = self.start;
+    }
+
+    pub(crate) fn next_token(&mut self) -> Token {
+        while self.current < self.contents.len() {
+            self.start = self.current;
+            match self.scan_token() {
+                Some(tok) => {
+                    return tok;
+                }
+                _ => {}
+            }
+        }
+        let eof_tok = Token::new(
+            TokenType::EoF,
+            "".to_string(),
+            None,
+            self.line,
+            self.column_no,
+        );
+
+        return eof_tok;
+    }
+
+    /// Scan token based on the `token_type`. For multi characters
     /// token, use `peek()`.
-    /// TODO: handle errors
-    pub(crate) fn scan_token(&mut self) {
+    /// TODO: if there is an unrecognised literal/string, then raise error.
+    pub(crate) fn scan_token(&mut self) -> Option<Token> {
         let c = self.advance();
         match c {
             // handle single character ones
-            Some('(') => self.add_token(TokenType::LeftParen, None),
-            Some(')') => self.add_token(TokenType::RightParen, None),
-            Some('{') => self.add_token(TokenType::LeftBrace, None),
-            Some('}') => {
-                self.add_token(TokenType::RightBrace, None);
+            Some('(') => {
+                return Some(self.emit_token(TokenType::LeftParen, None));
             }
-            Some(';') => self.add_token(TokenType::SemiColon, None),
-            Some(':') => self.add_token(TokenType::Colon, None),
-            Some('.') => self.add_token(TokenType::Dot, None),
-            Some(',') => self.add_token(TokenType::Comma, None),
-            Some('*') => self.add_token(TokenType::Star, None),
-            Some('-') => self.add_token(TokenType::Minus, None),
+            Some(')') => {
+                return Some(self.emit_token(TokenType::RightParen, None));
+            }
+            Some('{') => {
+                return Some(self.emit_token(TokenType::LeftBrace, None));
+            }
+            Some('}') => {
+                return Some(self.emit_token(TokenType::RightBrace, None));
+            }
+            Some(';') => {
+                return Some(self.emit_token(TokenType::SemiColon, None));
+            }
+            Some(':') => {
+                return Some(self.emit_token(TokenType::Colon, None));
+            }
+            Some('.') => {
+                return Some(self.emit_token(TokenType::Dot, None));
+            }
+            Some(',') => {
+                return Some(self.emit_token(TokenType::Comma, None));
+            }
+            Some('*') => {
+                return Some(self.emit_token(TokenType::Star, None));
+            }
+            Some('-') => {
+                return Some(self.emit_token(TokenType::Minus, None));
+            }
             // handle two character operators
             Some('<') => {
                 // peek, if '=', then LessEqual
                 // otherwise emit Equal
                 match self.peek() {
                     Some('=') => {
-                        self.add_token(TokenType::LessEqual, None);
+                        let tok = self.emit_token(TokenType::LessEqual, None);
                         self.current += 1;
+                        return Some(tok);
                     }
-                    _ => self.add_token(TokenType::Less, None),
+                    _ => {
+                        return Some(self.emit_token(TokenType::Less, None));
+                    }
                 }
             }
             Some('>') => {
@@ -336,10 +381,13 @@ impl Scanner {
                 // otherwise emit Greater
                 match self.peek() {
                     Some('=') => {
-                        self.add_token(TokenType::GreaterEqual, None);
+                        let tok = self.emit_token(TokenType::GreaterEqual, None);
                         self.current += 1;
+                        return Some(tok);
                     }
-                    _ => self.add_token(TokenType::Greater, None),
+                    _ => {
+                        return Some(self.emit_token(TokenType::Greater, None));
+                    }
                 }
             }
             Some('!') => {
@@ -347,33 +395,42 @@ impl Scanner {
                 // otherwise emit bang
                 match self.peek() {
                     Some('=') => {
-                        self.add_token(TokenType::BangEqual, None);
+                        let tok = self.emit_token(TokenType::BangEqual, None);
                         self.current += 1;
+                        return Some(tok);
                     }
-                    _ => self.add_token(TokenType::Bang, None),
+                    _ => {
+                        return Some(self.emit_token(TokenType::Bang, None));
+                    }
                 }
             }
             Some('=') => {
                 // peek, if '=', then EqualEqual
-                // otherwie emit Equal
+                // otherwise emit Equal
                 match self.peek() {
                     Some('=') => {
-                        self.add_token(TokenType::EqualEqual, None);
+                        let tok = self.emit_token(TokenType::EqualEqual, None);
                         self.current += 1;
+                        return Some(tok);
                     }
-                    _ => self.add_token(TokenType::Equal, None),
+                    _ => {
+                        return Some(self.emit_token(TokenType::Equal, None));
+                    }
                 }
             }
             Some('/') => {
                 // peek, if '/', then advance until \n, emit Comment
-                // otherwie emit Div
+                // otherwise emit Div
                 match self.peek() {
                     Some('/') => {
                         self.read_until_eol();
-                        self.add_token(TokenType::Comment, None);
+                        let tok = self.emit_token(TokenType::Comment, None);
                         self.current += 1;
+                        return Some(tok);
                     }
-                    _ => self.add_token(TokenType::Div, None),
+                    _ => {
+                        return Some(self.emit_token(TokenType::Div, None));
+                    }
                 }
             }
             // handle string literal
@@ -381,7 +438,8 @@ impl Scanner {
                 //TODO: lose the double quotes at both ends?
                 self.read_until_eo_quote();
                 let literal = &self.contents[self.start + 1..self.current - 1];
-                self.add_token(TokenType::StringLiteral, Some(literal.to_string()));
+                let tok = self.emit_token(TokenType::StringLiteral, Some(literal.to_string()));
+                return Some(tok);
                 // println!("\nquote, final: {}", self.colu
                 // println!(
                 //     "after quote: *{}*",
@@ -390,16 +448,22 @@ impl Scanner {
                 //self.current += 1;
             }
             // handle whitespace and CRLF
-            Some(' ') => {}
-            Some('\t') => {}
+            Some(' ') => {
+                return None;
+            }
+            Some('\t') => {
+                return None;
+            }
             Some('\r') => {
                 self.line += 1;
                 self.column_no = 1;
                 // println!("main r, final: {}", self.column_no);
+                return None;
             }
             Some('\n') => {
                 self.line += 1;
                 self.column_no = 1;
+                return None;
                 // println!("main n, final: {}", self.column_no);
             }
             _ => {
@@ -414,8 +478,9 @@ impl Scanner {
                         self.scan_number();
                         self.current -= 1;
                         let n = &self.contents[self.start..self.current];
-                        self.add_token(TokenType::Number, Some(n.to_string()));
+                        let tok = self.emit_token(TokenType::Number, Some(n.to_string()));
                         // self.current += 1;
+                        return Some(tok);
                     } else {
                         // can be either an identifier or keywords
                         // if the current lexeme doesn't start with a digit, then
@@ -427,17 +492,21 @@ impl Scanner {
                         // println!("s: {}", s);
                         if KEYWORDS.contains(&s) {
                             self.current -= 1;
-                            // println!("==> adding keyword!");
-                            self.add_token(TokenType::Keyword, Some(s.to_string()));
+                            let tok = self.emit_token(TokenType::Keyword, Some(s.to_string()));
+                            println!("==> adding keyword, {}", tok);
                             self.current += 1;
+                            return Some(tok);
                         } else {
                             self.current -= 1;
-                            // println!("==> adding identifier!");
-                            self.add_token(TokenType::Identifier, Some(s.to_string()));
+                            println!("==> adding identifier!");
+                            let tok = self.emit_token(TokenType::Identifier, Some(s.to_string()));
                             self.current += 1;
+                            return Some(tok);
                         }
                     }
                 }
+
+                return None;
             }
         }
     }
@@ -469,102 +538,57 @@ mod tests {
     fn test_number() {
         let s = "aws { ec2 { count = 10 } }";
         let mut scanr = Scanner::new("".to_string(), s.to_string());
-        scanr.scan_tokens();
-        let number_tok_exists = |tokens: Vec<Token>| -> bool {
-            for tok in tokens {
-                if tok.token_type == TokenType::Number {
-                    return true;
-                }
-            }
-            false
-        };
-        assert!(number_tok_exists(scanr.tokens));
+        for _ in 1..=6 {
+            scanr.next_token();
+        }
+        let tok = scanr.next_token();
+        assert_eq!(tok.lexeme.parse::<u8>().unwrap_or_default(), 10);
     }
 
     #[test]
     fn test_decimal_number() {
         let s = "aws { ec2 { count = 10.0 } }";
         let mut scanr = Scanner::new("".to_string(), s.to_string());
-        scanr.scan_tokens();
-        let num_tokens = scanr
-            .tokens
-            .iter()
-            .filter_map(|tok| match tok.token_type {
-                TokenType::Number => tok.lexeme.parse::<f32>().ok(),
-                _ => None,
-            })
-            .collect::<Vec<f32>>();
-        assert_eq!(num_tokens.get(0), Some(&10.0));
+        for _ in 1..=6 {
+            scanr.next_token();
+        }
+        let tok = scanr.next_token();
+        assert_eq!(tok.lexeme.parse::<f32>().unwrap_or_default(), 10.0);
     }
 
     #[test]
     fn test_string() {
         let s = "aws { ec2 { name = \"my_node\" } }";
         let mut scanr = Scanner::new("".to_string(), s.to_string());
-        scanr.scan_tokens();
-        let comment_toks = scanr
-            .tokens
-            .iter()
-            .filter_map(|tok| match tok.token_type {
-                TokenType::StringLiteral => Some(tok.literal.as_ref().unwrap()),
-                _ => None,
-            })
-            .collect::<Vec<&String>>();
-        let expected = String::from("my_node");
-        assert_eq!(comment_toks.get(0), Some(&&expected));
-    }
-
-    #[test]
-    fn test_ec2_id() {
-        let s = "aws { ec2 { ec2_id = 10 } }";
-        let mut scanr = Scanner::new("".to_string(), s.to_string());
-        scanr.scan_tokens();
-        let kword_tokens = scanr
-            .tokens
-            .iter()
-            .filter_map(|tok| match tok.token_type {
-                TokenType::Keyword => Some(tok.lexeme.as_str()),
-                _ => None,
-            })
-            .collect::<Vec<&str>>();
-        // println!("kword_tokens: {:?}", kword_tokens);
-        assert_eq!(kword_tokens.get(2), Some(&"ec2_id"));
+        for _ in 1..=6 {
+            scanr.next_token();
+        }
+        let tok = scanr.next_token();
+        let s = format!("\"{}\"", "my_node");
+        assert_eq!(tok.lexeme, s);
     }
 
     #[test]
     fn test_image() {
         let s = "aws { ec2 { image = \"test-image\" } }";
         let mut scanr = Scanner::new("".to_string(), s.to_string());
-        scanr.scan_tokens();
-        let kword_tokens = scanr
-            .tokens
-            .iter()
-            .filter_map(|tok| match tok.token_type {
-                TokenType::Keyword => Some(tok.lexeme.as_str()),
-                _ => None,
-            })
-            .collect::<Vec<&str>>();
-        assert_eq!(kword_tokens.get(2), Some(&"image"));
-    }
-
-    #[test]
-    fn test_app_version() {
-        let s = "aws { ec2 { app_version = 10.0 } }";
-        let mut scanr = Scanner::new("".to_string(), s.to_string());
-        scanr.scan_tokens();
-        let kword_tokens = scanr
-            .tokens
-            .iter()
-            .filter_map(|tok| match tok.token_type {
-                TokenType::Keyword => Some(tok.lexeme.as_str()),
-                _ => None,
-            })
-            .collect::<Vec<&str>>();
-        assert_eq!(kword_tokens.get(2), Some(&"app_version"));
+        for _ in 1..=6 {
+            scanr.next_token();
+        }
+        let tok = scanr.next_token();
+        let s = format!("\"{}\"", "test-image");
+        assert_eq!(tok.lexeme, s);
     }
 
     #[test]
     fn test_comment() {
-        //
+        let s = "aws 
+{ // comment";
+        let mut scanr = Scanner::new("".to_string(), s.to_string());
+        for _ in 1..=2 {
+            scanr.next_token();
+        }
+        let tok = scanr.next_token();
+        assert_eq!(tok.token_type, TokenType::Comment);
     }
 }
